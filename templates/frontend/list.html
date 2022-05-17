@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>    
+    <title>To Do</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+
+	<link href="https://fonts.googleapis.com/css?family=Montserrat&display=swap" rel="stylesheet">
+
+	<style type = "text/css"> 
+		body{
+		  background: rgb(54,217,182);
+		  background: linear-gradient(90deg, rgba(54,217,182,1) 0%, rgba(32,152,126,1) 43%, rgba(0,212,255,1) 100%);
+		}
+
+
+		h1, h2, h3, h4, h5, p, span, strike{
+		  font-family: 'Montserrat', sans-serif;
+
+		}
+
+        #task-container{
+            max-width : 600px;
+            margin : 0 auto;
+            box-shadow : box-shadow: 1px 10px 5px 0px rgba(0,0,0,0.75);
+            -webkit-box-shadow: 1px 10px 5px 0px rgba(0,0,0,0.75);
+            -moz-box-shadow: 1px 10px 5px 0px rgba(0,0,0,0.75);
+            background-color : #fff;
+            margin-top : 100px;
+            margin-botton : 100px;
+            justify-content : space-around;
+            align-item : flex-start;
+
+        }
+
+        #form-wrapper{
+            position : -webkit-sticky;
+            position : sticky;
+            top : 0 rem;
+            border-botton : 1px solid #e9e9e9;
+            background-color : #fff;
+            box-shadow: box-shadow: 1px 10px 5px 0px rgba(0,0,0,0.75);
+            -webkit-box-shadow: 1px 10px 5px 0px rgba(0,0,0,0.75);
+            -moz-box-shadow: 1px 10px 5px 0px rgba(0,0,0,0.75);
+            padding : 40px;
+        }
+
+        #submit{
+            background-color : #36b9d6;
+            border-radius : 0px;
+            border : 0;
+            color : #fff;
+        }
+
+        .flex-wrapper{
+            display : flex;
+        }
+
+        .task-wrapper{  /*this is actual list */
+            margin :5px ;
+            padding : 5px;
+            padding : 20px;
+            cursor : pointer;
+            border-botton : 1px solid #e9e9e9;
+            color : #686868;
+        }
+
+    </style>
+  </head>
+  <body>
+    <div class = "container"> <!--bootstrap container , that holds all the elements-->
+        <div id = "task-container">
+            <div id = "form-wrapper"> <!--it wraps all the item here-->
+                <form id = "form">
+                    <div class = "flex-wrapper">
+                        <div style ="flex : 6">
+                            <input id = "title" class = "form-control" type = "text" name = "title" placeholder ="Add task">
+
+                        </div>
+
+                        <div style = "flex : 1"><!-- we are using flex grid here , to make sure its inline-->
+                            <input id = "submit" class = "btn" type = "submit">
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div id = "list-wrapper">
+            </div>
+        </div>
+    </div>
+
+    <script type ="text/javascript">
+     /* 
+     KEY COMPONENETS:
+     "active item" : null until an edit button is clicked, will contain object of item we are editing.
+     "list_snapshot" : will contain previous state of list.Used for removing extra rows on list update.
+     
+     PROCESS:
+     1 - Fetch data and build rows "buildList()"
+     2 - Create items in form submit
+     3 - Edit item click - Prefill form and change submit url
+     4 - Delete item - send item url to delete URL
+     5 - cross out complete task - event handle update item
+     
+        notes:
+        -ADD EVENT HANDLER TO EDT , DELETE , TITLE. 
+        -Render with strike through items completed
+        -remove extra data on re-Render
+        -CSRF token  
+
+     */
+     
+//django creating token for us and throws into variable
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    // Does this cookie string begin with the name we want?
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        const csrftoken = getCookie('csrftoken');
+        var activeItem = null //it helps to distiguish whether we are editing a item or creating a item
+
+buildList()
+ function buildList(){  //reponsible for calling data and output it to wrapper.
+     //here we want to first select the wrapper to where those item will be output so we want to get the id of list-wrapper.
+     var wrapper = document.getElementById("list-wrapper")
+     //we are clearing wrapperineach new render
+     wrapper.innerHTML = ""
+     //now, we need to call the data so we are going to fetch API for this so we will write an URL.
+     var url = "http://127.0.0.1:8000/api/task-list/" //here , we will retrieve an array of JSON objects.
+     fetch(url)
+     .then((resp) => resp.json()) //we need to get that data and turn it into JSON response
+     .then (function(data){
+         console.log('Data :', data)
+//until here.successful API call to database
+
+     var list = data 
+     for (var i in list){
+ //back-tick for js template literal
+ /*
+inside template:
+1 - we are giving each item ,each id. ${i} it means current iteration based on.
+2 -inside span, we access the list item title
+3 - then, we edit the list item title
+4 - we delete the list item title
+ */
+     var item = `
+            <div id = "data-row-${i}" class ="task-wrapper flex-wrapper"> 
+            <div style = "flex : 7">
+             <span class = "title">${list[i].title}</span> 
+            </div>
+            <div style = "flex : 1">
+                <botton class = "btn btn-sm btn-outline-info edit">Edit</botton> 
+            </div>
+            <div style = "flex : 7">
+                <botton class = "btn btn-sm btn-outline-info delete">-</botton> 
+            </div>
+            </div>
+          `
+  //until here , we created an item and now we are going to append each item to that list-wrapper.
+  //here , we query the given id of each list-wrapper
+            wrapper.innerHTML += item
+
+       }
+
+
+      //for edititems
+       for (var i in list){
+        var editBtn = document.getElementsByClassName('edit')[i]
+        var deleteBtn = document.getElementsByClassName('delete')[i]
+
+        editBtn.addEventListener('click' , (function(item){
+            return function(){
+                editItem(list[i])
+
+            }
+        })(list[i]))  //this let us store that reference in that local state for that function
+
+       
+       
+        deleteBtn.addEventListener('click' , (function(item){
+            return function(){
+                deleteItem(item)
+
+            }
+        })(list[i])) 
+
+       }
+        
+})
+ }
+  
+ var form = document.getElementById("form-wrapper")
+ form.addEventListener('submit' , function(e){
+    e.preventDefault()
+    console.log("form submitted")
+    var url = "http://127.0.0.1:8000/api/task-create/"
+    if(activeItem != null){
+        var url = `http://127.0.0.1:8000/api/task-update/${activeItem.id}`
+        activeItem = null
+    }  
+
+    // to submit the post data , we are going to fetch API 
+    var url = "http://127.0.0.1:8000/api/task-create/" //here task-create will create a task 
+    var title =  document.getElementById("title").value
+    //now , set teh fetch call , here we throw some parameters by creating dictionary
+    fetch(url, {
+        method : 'POST',
+        headers : {
+            'content-type' : 'application/json',
+            'X-CSRFToken' : csrftoken,
+        },
+        body : JSON.stringify({'title' : title})
+
+        //again,here call that buildList so that we can submit data and want to rerender that list
+    }).then(function(response){
+        buildList()
+    })
+ })
+
+ function editItem(item){
+     console.log("Item Clicked:" , item)
+     activeItem  =  item   //zctive items does 2 things:
+    document.getElementById('title').value = activeItem.title     // 1- it sets active items to the object that we clicked on thats why we need to store that reference
+                                    //2 - we also need to set the value of forms to this item
+ }
+
+ function deleteItem(item){
+     console.log("Delete clicked")
+     fetch( `http://127.0.0.1:8000/api/task-delete/${item.id}/`,{
+        method : 'DELETE',
+        headers : {
+            'content-type' : 'application/json',
+            'X-CSRFToken' : csrftoken,
+        },
+
+     }).then((response) => {
+         buildList()
+     })
+     
+
+ }
+
+
+    </script>
+
+  </body>
+</html>
